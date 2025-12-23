@@ -4,10 +4,10 @@
 <meta charset="UTF-8">
 <title>Anonymous Cyber Chat</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
 
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
-
 * { box-sizing: border-box; }
 
 body {
@@ -51,11 +51,6 @@ input, button {
   font-family: inherit;
 }
 
-input::placeholder { color: #00ffcc88; }
-
-button {
-  cursor: pointer;
-}
 button:hover {
   background: #00ffcc22;
   box-shadow: 0 0 12px #00ffcc55;
@@ -72,7 +67,6 @@ button:hover {
   border-radius: 10px;
   padding: 10px;
   overflow-y: auto;
-  box-shadow: inset 0 0 20px #00ffcc11;
 }
 
 .msg {
@@ -83,15 +77,6 @@ button:hover {
 
 .ownerName { color: #ff003c; }
 .userName { color: #00ffcc; }
-
-.msg img {
-  max-width: 220px;
-  margin-top: 5px;
-  border-radius: 6px;
-  box-shadow: 0 0 10px #00ffcc33;
-}
-
-.msg a { color: #38bdf8; text-decoration: none; }
 
 .deleteBtn {
   margin-left: 10px;
@@ -115,42 +100,33 @@ button:hover {
 
 <body>
 
-<!-- LOGIN -->
 <div id="login">
   <div class="panel">
     <h2>ANONYMOUS CYBER CHAT</h2>
     <input id="username" placeholder="Anonymous-(bebas)">
     <input id="password" type="password" placeholder="Password">
-    <button onclick="login()">ENTER</button>
+    <button id="loginBtn">ENTER</button>
   </div>
 </div>
 
-<!-- CHAT -->
 <div id="chat">
   <h3 id="roleLabel"></h3>
   <div id="chatBox"></div>
-
   <div class="footer">
     <input type="text" id="message" placeholder="type message / emoji ☠️">
     <input type="file" id="file">
-    <button onclick="send()">SEND</button>
+    <button id="sendBtn">SEND</button>
   </div>
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
 import {
-  getFirestore,
-  collection,
-  addDoc,
-  query,
-  orderBy,
-  onSnapshot,
-  deleteDoc,
-  doc
+  getFirestore, collection, addDoc,
+  query, orderBy, onSnapshot,
+  deleteDoc, doc
 } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
 
-/* FIREBASE CONFIG */
 const firebaseConfig = {
   apiKey: "AIzaSyBxuQ6QeO1mWeMDQ9KwZtbbHv4ojdFCDwY",
   authDomain: "anonymous-chat-jhon.firebaseapp.com",
@@ -164,98 +140,71 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const chatRef = collection(db, "chat");
 
-let currentUser = {};
-const chatBox = document.getElementById("chatBox");
+const el = id => document.getElementById(id);
 
-/* LOGIN */
-window.login = () => {
-  const u = username.value || "Anonymous";
-  const p = password.value;
+let currentUser = null;
 
-  if (p !== "0012300" && p !== "221220") {
+el("loginBtn").onclick = () => {
+  const u = el("username").value || "Anonymous";
+  const p = el("password").value;
+
+  if (p === "221220") {
+    currentUser = { name: "Owner Jhon Software", role: "owner" };
+  } else if (p === "0012300") {
+    currentUser = { name: "Anonymous-" + u, role: "user" };
+  } else {
     alert("ACCESS DENIED");
     return;
   }
 
-  currentUser = p === "221220"
-    ? { name: "Owner Jhon Software", role: "owner" }
-    : { name: u, role: "user" };
-
-  login.style.display = "none";
-  chat.style.display = "flex";
-  roleLabel.innerText = "[ CONNECTED AS ] " + currentUser.name;
+  el("login").style.display = "none";
+  el("chat").style.display = "flex";
+  el("roleLabel").innerText = "[ CONNECTED AS ] " + currentUser.name;
 };
 
-/* SEND */
-window.send = async () => {
-  const text = message.value;
-  const file = document.getElementById("file").files[0];
-  if (!text && !file) return;
-
-  if (file) {
-    const reader = new FileReader();
-    reader.onload = async () => {
-      await addDoc(chatRef, {
-        user: currentUser.name,
-        role: currentUser.role,
-        file: reader.result,
-        fileName: file.name,
-        time: Date.now()
-      });
-    };
-    reader.readAsDataURL(file);
-  } else {
-    await addDoc(chatRef, {
-      user: currentUser.name,
-      role: currentUser.role,
-      text,
-      time: Date.now()
-    });
-  }
-
-  message.value = "";
-  file.value = "";
-};
-
-/* ENTER TO SEND */
-message.addEventListener("keydown", e => {
-  if (e.key === "Enter" && !e.shiftKey) {
+el("sendBtn").onclick = send;
+el("message").addEventListener("keydown", e => {
+  if (e.key === "Enter") {
     e.preventDefault();
-    window.send();
+    send();
   }
 });
 
-/* DELETE (OWNER) */
+async function send() {
+  if (!currentUser) return;
+
+  const text = el("message").value.trim();
+  if (!text) return;
+
+  await addDoc(chatRef, {
+    user: currentUser.name,
+    role: currentUser.role,
+    text,
+    time: Date.now()
+  });
+
+  el("message").value = "";
+}
+
 window.deleteMessage = async id => {
-  if (currentUser.role !== "owner") return;
-  await deleteDoc(doc(db, "chat", id));
+  if (currentUser?.role === "owner") {
+    await deleteDoc(doc(db, "chat", id));
+  }
 };
 
-/* REALTIME */
 const q = query(chatRef, orderBy("time"));
 onSnapshot(q, snap => {
-  chatBox.innerHTML = "";
+  el("chatBox").innerHTML = "";
   snap.forEach(d => {
-    const data = d.data();
-    const nameClass = data.role === "owner" ? "ownerName" : "userName";
+    const m = d.data();
     const div = document.createElement("div");
     div.className = "msg";
     div.innerHTML = `
-      <span class="${nameClass}">${data.user}</span> :
-      ${data.text || ""}
-      ${currentUser.role === "owner" ? `<span class="deleteBtn" onclick="deleteMessage('${d.id}')">[DELETE]</span>` : ""}
+      <span class="${m.role === "owner" ? "ownerName" : "userName"}">${m.user}</span> :
+      ${m.text}
+      ${currentUser?.role === "owner" ? `<span class="deleteBtn" onclick="deleteMessage('${d.id}')">[DELETE]</span>` : ""}
     `;
-
-    if (data.file) {
-      if (data.file.startsWith("data:image")) {
-        div.innerHTML += `<img src="${data.file}">`;
-      } else {
-        div.innerHTML += `<br><a href="${data.file}" download="${data.fileName}">Download ${data.fileName}</a>`;
-      }
-    }
-
-    chatBox.appendChild(div);
-    chatBox.scrollTop = chatBox.scrollHeight;
+    el("chatBox").appendChild(div);
   });
 });
 </script>
